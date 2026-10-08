@@ -1,6 +1,25 @@
 # BoringPet 桌面宠物
 
-一只住在桌面上的 AI 小宠物：PySide6 + pygame 的透明窗口宠物，带本地/云端 LLM 混排的 AI 对话、记忆系统、情绪系统、游戏陪伴评论、算命占卜、心率监测、录屏、音乐播放等功能。
+一只住在桌面上的 AI 小宠物：**AI 对话 + 记忆系统 + 情绪系统 + 游戏陪伴评论 + 算命占卜 + 心率监测 + 录屏 + 音乐播放**。
+
+![主界面](docs/screenshots/main.png)
+
+![情绪状态气泡](docs/screenshots/emotion.png) ![心率监测](docs/screenshots/heart.png)
+
+## ✨ 功能亮点
+
+| 功能 | 说明 |
+|---|---|
+| 🗣️ AI 对话 | 直连 DeepSeek/DSH，微信式短句聊天，支持看图 |
+| 🧠 记忆系统 | 对话向量化语义检索 + 重要记忆 + 事实画像 + 承诺，越聊越懂你 |
+| ❤️ 情绪系统 | 激素驱动（催产素/多巴胺/皮质醇）+ 亲密值/开心值/精力值，会想你、会失落 |
+| 🎮 游戏陪伴 | 你打游戏时它会看屏幕吐槽/鼓励，随机间隔主动说话 |
+| 🔮 算命占卜 | 塔罗/六爻/小六壬/八字，SQLite 记录 + 应验追踪 |
+| 💓 心率监测 | 连接小米手环等蓝牙设备，实时心率 + 关心提醒 |
+| 📹 录屏 | 心率超标自动录屏（含系统声音） |
+| 🎵 音乐播放 | 本地音乐 + 歌词窗口 |
+
+**⬇️ 下载打包版（Windows）**：[Releases 页面](https://github.com/Dyyjdx/BoringPet/releases) → 下载 `BoringPet.zip`，解压即用（无需装 Python）。
 
 **技术栈**：Python 3.12 / PySide6（GUI）/ pygame（音频）/ bleak（蓝牙）/ 云端 embedding API（记忆检索）/ SQLite（算命记录）
 **运行**：`python main.py`（或双击 `b-pet.bat`，入口 `main.py`）
