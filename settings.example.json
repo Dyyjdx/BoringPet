@@ -1,0 +1,51 @@
+{
+  "pet": {
+    "name": "你的桌宠名字",
+    "persona": "你是一只住在主人桌面上的小宠物，说话简短可爱，会撒娇会关心主人。",
+    "owner_name": "主人",
+    "size": 150,
+    "opacity": 1.0
+  },
+  "chat": {
+    "mode": "direct",
+    "provider": "deepseek",
+    "api_key": "在这里填你的 DeepSeek API Key",
+    "base_url": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat"
+  },
+  "active": {
+    "provider": "deepseek",
+    "api_key": "在这里填你的 DeepSeek API Key",
+    "base_url": "https://api.deepseek.com/v1",
+    "vision_model": "deepseek-flash",
+    "vision_base_url": "https://api.deepseek.com/v1",
+    "vision_api_key": "在这里填你的看图 API Key（可复用上面）",
+    "text_model": "deepseek-chat"
+  },
+  "intervals": {
+    "game_comment_minutes": 5,
+    "game_comment_min_minutes": 5,
+    "game_comment_max_minutes": 15,
+    "idle_longing_threshold": 1.0,
+    "idle_max_hours": 2,
+    "hr_alert_threshold": 115,
+    "hr_alert_interval_min": 2,
+    "recording_threshold": 105,
+    "idle_comment_minutes": 30,
+    "idle_comment_min_minutes": 1,
+    "idle_comment_max_minutes": 10
+  },
+  "divination": {
+    "deck": "major",
+    "spread": "three-card",
+    "reversals": true,
+    "birth": "你的公历生日，如 2006-02-26T15:40",
+    "remind": true
+  },
+  "vector": {
+    "api_key": "在这里填你的阿里百炼 API Key（不填则复用 chat.api_key）",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "text-embedding-v4",
+    "model_used": ""
+  }
+}

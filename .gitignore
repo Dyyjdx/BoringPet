@@ -1,0 +1,44 @@
+# --- BoringPet personal/project ignore ---
+
+# 用户本地配置与密钥（含 API Key，绝不提交）
+settings.json
+*.json.local
+config.json
+dsh_session.json
+
+# 运行时数据 / 记忆 / 对话状态
+memory/
+chat_state.json
+__pycache__/
+*.py[cod]
+
+# 录屏视频（体积大）
+recordings/
+*.mp4
+*.mkv
+*.avi
+
+# 大体积素材（动画帧/音乐，不随仓库分发，需自行准备）
+assets/
+音乐/
+音乐素材/
+
+# 日志与调试产物
+*.log
+*.pdb
+*.bak
+*.lnk
+
+# 临时文件
+.tmp
+dist/
+build/
+# PyInstaller 临时生成的 spec 不提交,但打包配置 BoringPet.spec 要提交
+*.spec
+!BoringPet.spec
+
+# 本地截图/调试图片
+*_debug*.png
+error*.png
+dl_*.png
+_test_*.jpg

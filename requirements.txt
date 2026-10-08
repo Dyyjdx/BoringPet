@@ -1,0 +1,19 @@
+# -*- coding: utf-8 -*-
+# BoringPet 运行依赖
+# 安装:pip install -r requirements.txt
+#
+# ★ 不需要 torch / transformers / sentence-transformers ★
+#   向量检索已改成调云端 embedding API(见 src/memory.py 顶部注释),
+#   main.py 里对 torch 的 import 是可选的。装上 torch 只会让安装包大 3~5 GB。
+
+PySide6>=6.5         # GUI 框架(透明窗口和所有界面)
+bleak>=0.20          # 蓝牙心率带(BLE)
+pygame>=2.5          # 音乐播放
+mutagen>=1.45        # 音频时长/标签解析(mp3/flac/ogg/m4a)
+imageio-ffmpeg>=0.4  # 录屏用的 ffmpeg 可执行文件(约 84 MB)
+psutil>=5.9          # 前台游戏进程检测
+oraclebone>=8.0      # 本地排盘(塔罗/六爻/小六壬/八字),算命功能需要
+dxcam>=0.0.5; sys_platform == "win32"   # 录屏抓帧;不装则录屏功能自动禁用
+
+# 可选:走本机 DeepSeek Harness 的对话通道(settings.json 里 chat.mode = "dsh")
+# deepseek-harness-sdk>=0.1.5
