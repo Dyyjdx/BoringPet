@@ -30,7 +30,7 @@
 # 1. 装依赖（不需要 torch/transformers）
 pip install -r requirements.txt
 
-# 2. 生成自己的配置文件（settings.json 含 API Key，已被 git 忽略，不会提交）
+# 2. 生成自己的配置文件
 copy settings.example.json settings.json
 # 然后编辑 settings.json，填入你的 API Key：
 #   - chat.api_key / active.api_key：DeepSeek（对话、看图、评论）
@@ -133,5 +133,4 @@ python main.py
   注意**全项目统一用 `import memory`**，不要写成 `from src import memory` ——
   那样会加载出第二份模块实例，两把锁各管各的，等于没有保护
 - 打包分发请看 [打包说明.md](打包说明.md)；代码审查发现的问题见 [docs/代码问题清单.md](docs/代码问题清单.md)
-- ⚠️ **`settings.json` 里有 API Key，绝不打包/分享出去**。`.gitignore` 已忽略它，
-  `build_exe.bat` 也会强制删除误打包的副本
+
