@@ -32,6 +32,10 @@ echo.
 set "PY="
 if exist "%~dp0python\python.exe" set "PY=%~dp0python\python.exe"
 if not defined PY if exist "%~dp0.venv\Scripts\python.exe" set "PY=%~dp0.venv\Scripts\python.exe"
+rem Prefer a real Anaconda install over whatever `where python` finds
+rem first (e.g. a sandbox/runtime python whose PySide6 DLLs may not load
+rem on a normal machine). Adjust the path if Anaconda lives elsewhere.
+if not defined PY if exist "D:\Anaconda\python.exe" set "PY=D:\Anaconda\python.exe"
 if not defined PY for /f "delims=" %%i in ('where python 2^>nul') do if not defined PY set "PY=%%i"
 if not defined PY goto :nopython
 
