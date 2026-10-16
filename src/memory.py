@@ -161,8 +161,8 @@ def tick_hormones():
         state["oxytocin"] = max(0.0, min(1.0, state.get("oxytocin", 0.70) * decay))
         state["dopamine"] = max(0.0, min(1.0, state.get("dopamine", 0.60) * decay))
         state["cortisol"] = max(0.0, min(1.0, state.get("cortisol", 0.10) * decay))
-        # ── 饥饿: 想念值随时间线性增长 ──
-        state["longing"] = max(0.0, min(1.0, state.get("longing", 0.0) + 0.30 * elapsed_hours))
+        # ── 饥饿: 想念值随时间线性增长(0.06/h, 约17小时才满, 平时不那么粘) ──
+        state["longing"] = max(0.0, min(1.0, state.get("longing", 0.0) + 0.06 * elapsed_hours))
         # ── 精力随时间缓慢恢复 ──
         state["energy"] = min(1.0, state.get("energy", 0.85) + 0.20 * elapsed_hours)
         state["primary_emotion"] = _calc_emotion(state)

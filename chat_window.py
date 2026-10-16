@@ -123,11 +123,11 @@ def _build_system_prompt():
 # 兼容保留: 实际使用处均已改为动态 _build_system_prompt(), 改设置即时生效
 SYSTEM_PROMPT = _build_system_prompt()
 
-# ── 配色(可爱粉紫系) ──
-C_BG = "#fdf5fa"
-C_TEXT = "#4a3a4a"
-C_SUB = "#b8a3b0"
-C_ACCENT = "#e879a8"
+# ── 配色(Fluent 浅色紫系, 与设置/用量窗口统一) ──
+C_BG = "#faf9fc"
+C_TEXT = "#2b2b3a"
+C_SUB = "#9a9ab0"
+C_ACCENT = "#7c6cf0"
 C_ERR = "#e05678"
 C_TOOL = "#f0a868"
 BUBBLE_W = 300
@@ -137,31 +137,32 @@ QWidget#chatRoot {{ background:{C_BG}; }}
 QListWidget#chatList {{ background:transparent; border:none; }}
 QListWidget#chatList::item {{ border:none; padding:6px 6px; }}
 QScrollBar:vertical {{ background:transparent; width:8px; margin:2px; }}
-QScrollBar::handle:vertical {{ background:#f0d5e4; border-radius:4px; min-height:30px; }}
-QScrollBar::handle:vertical:hover {{ background:#e8c0d8; }}
+QScrollBar::handle:vertical {{ background:#d4d2e4; border-radius:4px; min-height:30px; }}
+QScrollBar::handle:vertical:hover {{ background:#b8b5d0; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height:0; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background:transparent; }}
-QFrame#inputCard {{ background:#ffffff; border-radius:20px; border:1px solid #f5d9e8; }}
+QFrame#inputCard {{ background:#ffffff; border-radius:18px; border:1px solid #e8e6f0; }}
 QLineEdit {{ border:none; background:transparent; font-size:14px; color:{C_TEXT};
-             padding:12px 10px; selection-background-color:#fbd5e8; }}
-QPushButton#btnSend {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #f5a0c8, stop:1 #e879a8);
+             padding:12px 10px; selection-background-color:#e0daff; }}
+QLineEdit::placeholder {{ color:#b0b0c0; }}
+QPushButton#btnSend {{ background:{C_ACCENT};
                        color:white; border:none; border-radius:14px;
-                       padding:11px 22px; font-size:14px; font-weight:600; }}
-QPushButton#btnSend:hover {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #f8b0d0, stop:1 #ec85b0); }}
-QPushButton#btnSend:pressed {{ background:#d66898; }}
-QPushButton#btnSend:disabled {{ background:#f0c8dc; }}
-QPushButton#btnShot {{ background:#fdf0f6; color:#e879a8; border:1px solid #f5d9e8; border-radius:14px;
+                       padding:11px 24px; font-size:14px; font-weight:600; }}
+QPushButton#btnSend:hover {{ background:#8b7cf2; }}
+QPushButton#btnSend:pressed {{ background:#6a5bd8; }}
+QPushButton#btnSend:disabled {{ background:#c8c4e8; }}
+QPushButton#btnShot {{ background:#f2f1f8; color:#4a4a5a; border:none; border-radius:14px;
                        padding:10px 16px; font-size:13px; font-weight:600; }}
-QPushButton#btnShot:hover {{ background:#fbe5ef; }}
-QPushButton#btnNew {{ background:transparent; color:{C_SUB}; border:1px solid #f0d9e5;
+QPushButton#btnShot:hover {{ background:#e8e6f4; }}
+QPushButton#btnNew {{ background:transparent; color:{C_SUB}; border:1px solid #e0deec;
                      border-radius:14px; padding:10px 14px; font-size:13px; }}
-QPushButton#btnNew:hover {{ background:#faf0f5; }}
+QPushButton#btnNew:hover {{ background:#f4f2fa; }}
 """
 
-BUBBLE_USER = ("QLabel{background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #f5a0c8, stop:1 #e879a8);"
+BUBBLE_USER = ("QLabel{background:qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #8b7cf2, stop:1 #7c6cf0);"
                "color:white;border:none;border-radius:16px;"
                "padding:11px 15px;font-size:14px;}")
-BUBBLE_AI = ("QLabel{background:#ffffff;color:#5a4a5a;border:1px solid #f5d9e8;"
+BUBBLE_AI = ("QLabel{background:#ffffff;color:#4a4a5a;border:1px solid #e8e6f0;"
              "border-radius:16px;padding:11px 15px;font-size:14px;}")
 
 
@@ -834,7 +835,7 @@ class ChatWindow(QWidget):
         self._set_busy(False)
         self._div_busy = False
         if rec.get("error"):
-            self._append_hint(f"算命失败：{rec['error']}", color=C_ERR)
+            self._append_hint(f"决疑失败：{rec['error']}", color=C_ERR)
             self.agent_error.emit()
             return
         bubble = rec.get("bubble", "算出来了~")
@@ -1024,7 +1025,7 @@ class ChatWindow(QWidget):
         self.reply_received.emit()
 
     # ---------- 显示 ----------
-    def _append_hint(self, text, color="#c8a8b8"):
+    def _append_hint(self, text, color="#a0a0b8"):
         item = QListWidgetItem(text)
         item.setFlags(Qt.NoItemFlags)
         item.setTextAlignment(Qt.AlignCenter)

@@ -28,6 +28,12 @@ assets/
 *.pdb
 *.bak
 *.lnk
+build_log*.txt
+
+# 密钥/凭据（敏感，绝不提交）
+密钥.txt
+key*.txt
+*api_key*.txt
 
 # 临时文件
 .tmp

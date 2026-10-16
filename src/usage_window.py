@@ -1,67 +1,69 @@
 # -*- coding: utf-8 -*-
-"""Token 用量统计窗口 —— 粉蓝渐变可爱风。"""
+"""Token 用量统计窗口 —— Fluent 浅色简约风(数据可视化保留)。"""
 
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QPainter, QColor, QLinearGradient, QFont, QBrush, QPen
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QWidget,
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget,
+    QTableWidgetItem, QHeaderView, QWidget,
     QGraphicsDropShadowEffect,
 )
 
+from qfluentwidgets import PrimaryPushButton, FluentIcon
+
 from token_stats import get_today_stats, get_recent_records, get_recent_days, _is_peak_now
 
-# 主题色
-PINK = "#ff7eb3"
-PINK_L = "#ffc1d9"
-BLUE = "#6aa9ff"
-BLUE_L = "#b9d4ff"
-PURPLE = "#a78bfa"
-PURPLE_L = "#d8c8ff"
+# Fluent 主题色(低饱和,不刺眼)
+PINK = "#e0639b"
+BLUE = "#3b8be0"
+PURPLE = "#7c6cf0"
+GRAY = "#a0a0b8"
 
 QSS = """
 QDialog {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #fff5f9, stop:0.55 #fdf3ff, stop:1 #f0f6ff);
+    background: #faf9fc;
     font-family: "Microsoft YaHei";
 }
-QLabel { color: #5a4a6a; font-family: "Microsoft YaHei"; }
+QLabel {
+    color: #3a3a4a;
+    font-family: "Microsoft YaHei";
+}
 #title {
-    font-size: 22px; font-weight: 800; color: #8a5a9a;
+    font-size: 20px; font-weight: 800; color: #2b2b3a;
 }
 #subtitle {
-    font-size: 11px; color: #a08aa8;
+    font-size: 11px; color: #9a9ab0;
 }
 #peakBadge {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #fff0f5, stop:1 #f0f4ff);
-    color: #b0608a;
-    border: 1.5px solid #ffd0e0;
+    background: #fff3e0;
+    color: #d0842a;
+    border: 1px solid #ffe0b3;
     border-radius: 14px;
-    padding: 6px 14px;
+    padding: 6px 16px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
 }
 #sectionTitle {
-    font-size: 13px; font-weight: 700; color: #7a5a8a;
-    border-left: 4px solid #c8a6ff;
+    font-size: 13px; font-weight: 700; color: #4a4a5a;
+    border-left: 4px solid #7c6cf0;
     padding-left: 8px;
 }
 QTableWidget {
-    background: rgba(255,255,255,0.92);
-    border: 1.5px solid #eeddf5;
-    border-radius: 12px;
+    background: white;
+    border: 1px solid #e8e6f0;
+    border-radius: 10px;
     gridline-color: transparent;
     font-size: 12px;
-    color: #4a3a5a;
-    alternate-background-color: #fbf6fd;
-    selection-background-color: #ffe6f0;
-    selection-color: #8a4a6a;
+    color: #3a3a4a;
+    alternate-background-color: #f7f6fb;
+    selection-background-color: #ece9ff;
+    selection-color: #3a3a4a;
 }
-QTableWidget::item { padding: 8px 6px; border-bottom: 1px solid #f6ecfa; }
-QTableWidget::item:hover { background: #fff0f7; }
+QTableWidget::item { padding: 8px 6px; border-bottom: 1px solid #f2f1f8; }
+QTableWidget::item:hover { background: #f4f2ff; }
 QHeaderView::section {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffd6e8, stop:1 #d6e4ff);
-    color: #6a4a7a;
+    background: #f2f1f8;
+    color: #5a5a6a;
     padding: 10px 6px;
     border: none;
     font-weight: 700;
@@ -71,39 +73,19 @@ QScrollBar:vertical {
     background: transparent; width: 8px; margin: 4px;
 }
 QScrollBar::handle:vertical {
-    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 #ffb8d4, stop:1 #b8d0ff);
-    border-radius: 4px; min-height: 30px;
+    background: #d4d2e4; border-radius: 4px; min-height: 30px;
 }
+QScrollBar::handle:vertical:hover { background: #b8b5d0; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-#refreshBtn {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff9ec4, stop:1 #8ec5ff);
-    color: white;
-    border: none;
-    border-radius: 18px;
-    padding: 10px 34px;
-    font-size: 13px;
-    font-weight: 700;
-    font-family: "Microsoft YaHei";
-}
-#refreshBtn:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff8ab8, stop:1 #76b6ff);
-}
-#refreshBtn:pressed { padding-top: 12px; }
-#cardTitle {
-    font-size: 12px; font-weight: 700;
-}
-#cardValue {
-    font-size: 24px; font-weight: 800;
-}
-#cardSub {
-    font-size: 10px; color: #b09ab0;
-}
+#cardTitle { font-size: 12px; font-weight: 700; color: #6a6a7a; }
+#cardValue { font-size: 24px; font-weight: 800; }
+#cardSub { font-size: 10px; color: #b0b0c0; }
 """
 
 
 class StatCard(QWidget):
-    """渐变统计卡片。"""
+    """统计卡片:白底圆角 + 左侧色条 + 顶部渐变点缀(极简)。"""
 
     def __init__(self, icon, title, color_a, color_b, parent=None):
         super().__init__(parent)
@@ -111,7 +93,7 @@ class StatCard(QWidget):
         self._c2 = QColor(color_b)
         self.setFixedHeight(96)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(18, 12, 18, 10)
+        lay.setContentsMargins(20, 14, 18, 12)
         lay.setSpacing(2)
 
         self._value = QLabel("0")
@@ -124,7 +106,6 @@ class StatCard(QWidget):
         icon_l.setStyleSheet("font-size: 15px;")
         t = QLabel(title)
         t.setObjectName("cardTitle")
-        t.setStyleSheet("color: #8a6a9a;")
         row.addWidget(icon_l)
         row.addWidget(t)
         row.addStretch()
@@ -134,27 +115,25 @@ class StatCard(QWidget):
         self._sub.setObjectName("cardSub")
         lay.addWidget(self._sub)
 
-        # 投影
+        # 柔和投影
         sh = QGraphicsDropShadowEffect(self)
-        sh.setBlurRadius(22)
-        sh.setOffset(0, 4)
-        sh.setColor(QColor(200, 160, 220, 60))
+        sh.setBlurRadius(20)
+        sh.setOffset(0, 3)
+        sh.setColor(QColor(180, 170, 220, 45))
         self.setGraphicsEffect(sh)
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        grad = QLinearGradient(0, 0, self.width(), self.height())
-        grad.setColorAt(0, self._c1.lighter(165))
-        grad.setColorAt(1, self._c2.lighter(170))
-        p.setBrush(QBrush(grad))
-        p.setPen(QPen(QColor(255, 255, 255, 190), 1.2))
-        p.drawRoundedRect(rect, 16, 16)
-        # 右上装饰圆点
+        # 白底
+        p.setBrush(QBrush(QColor("white")))
+        p.setPen(QPen(QColor(230, 228, 242, 200), 1))
+        p.drawRoundedRect(rect, 14, 14)
+        # 左侧竖色条
         p.setBrush(QBrush(self._c1))
         p.setPen(Qt.NoPen)
-        p.drawEllipse(QPointF(self.width() - 24, 20), 26, 26)
+        p.drawRoundedRect(QRectF(rect.x(), rect.y() + 18, 5, rect.height() - 36), 2.5, 2.5)
 
     def set_value(self, v):
         self._value.setText(v)
@@ -164,11 +143,11 @@ class StatCard(QWidget):
 
 
 class TrendChart(QWidget):
-    """近7天用量迷你柱状图(粉蓝紫渐变)。"""
+    """近7天用量迷你柱状图(Fluent 蓝紫渐变)。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._data = []  # [(label, tokens, cost)]
+        self._data = []  # [(label, tokens, cost, cnt)]
         self.setMinimumHeight(132)
 
     def set_data(self, data):
@@ -180,7 +159,7 @@ class TrendChart(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         w, h = self.width(), self.height()
         if not self._data:
-            p.setPen(QColor("#b09ab0"))
+            p.setPen(QColor("#a0a0b8"))
             p.setFont(QFont("Microsoft YaHei", 10))
             p.drawText(self.rect(), Qt.AlignCenter, "还没有用量数据，先去聊聊天吧~")
             return
@@ -190,7 +169,7 @@ class TrendChart(QWidget):
         bar_w = min(34, slot * 0.5)
         pad_top = 18
         chart_h = h - pad_top - 24
-        colors = [QColor("#ff9ec4"), QColor("#c3a6ff"), QColor("#8ec5ff")]
+        colors = [QColor("#3b8be0"), QColor("#7c6cf0"), QColor("#e0639b")]
         for i, (label, tokens, cost, _cnt) in enumerate(self._data):
             cx = slot * i + slot / 2
             bh = max(2, chart_h * tokens / max_v)
@@ -204,12 +183,12 @@ class TrendChart(QWidget):
             p.drawRoundedRect(rect, 7, 7)
             # 数值(>0 才标)
             if tokens > 0:
-                p.setPen(QColor("#8a6a9a"))
+                p.setPen(QColor("#6a6a7a"))
                 p.setFont(QFont("Microsoft YaHei", 8, QFont.Bold))
                 p.drawText(QRectF(rect.x() - 4, rect.y() - 14, bar_w + 8, 12),
                            Qt.AlignCenter, f"{tokens}")
             # 日期
-            p.setPen(QColor("#a08aa8"))
+            p.setPen(QColor("#9a9ab0"))
             p.setFont(QFont("Microsoft YaHei", 8))
             p.drawText(QRectF(cx - slot / 2, h - 20, slot, 16), Qt.AlignCenter, label)
 
@@ -234,7 +213,7 @@ class UsageWindow(QDialog):
         head = QHBoxLayout()
         title_box = QVBoxLayout()
         title_box.setSpacing(2)
-        title = QLabel("💎 Token 用量统计")
+        title = QLabel("Token 用量统计")
         title.setObjectName("title")
         title_box.addWidget(title)
         sub = QLabel("每次调用都按 API 真实 token + 峰谷时价精确计费")
@@ -251,9 +230,9 @@ class UsageWindow(QDialog):
         # ── 今日统计卡片 ──
         cards = QHBoxLayout()
         cards.setSpacing(14)
-        self._count_card = StatCard("💬", "今日对话", PINK, PINK_L)
-        self._tokens_card = StatCard("📊", "今日 Token", BLUE, BLUE_L)
-        self._cost_card = StatCard("💰", "今日费用", PURPLE, PURPLE_L)
+        self._count_card = StatCard("💬", "今日对话", PINK, PINK)
+        self._tokens_card = StatCard("📊", "今日 Token", BLUE, BLUE)
+        self._cost_card = StatCard("💰", "今日费用", PURPLE, PURPLE)
         cards.addWidget(self._count_card)
         cards.addWidget(self._tokens_card)
         cards.addWidget(self._cost_card)
@@ -264,7 +243,8 @@ class UsageWindow(QDialog):
         sec.setObjectName("sectionTitle")
         root.addWidget(sec)
         self._chart = TrendChart()
-        self._chart.setStyleSheet("background: rgba(255,255,255,0.85); border: 1.5px solid #eeddf5; border-radius: 12px;")
+        self._chart.setStyleSheet(
+            "background: white; border: 1px solid #e8e6f0; border-radius: 10px;")
         root.addWidget(self._chart)
 
         # ── 明细表 ──
@@ -285,12 +265,10 @@ class UsageWindow(QDialog):
         self._table.setShowGrid(False)
         root.addWidget(self._table, 1)
 
-        # ── 刷新按钮 ──
+        # ── 刷新按钮(Fluent) ──
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        refresh_btn = QPushButton("🔄 刷新")
-        refresh_btn.setObjectName("refreshBtn")
-        refresh_btn.setCursor(Qt.PointingHandCursor)
+        refresh_btn = PrimaryPushButton(FluentIcon.SYNC, "刷新")
         refresh_btn.clicked.connect(self._load_data)
         btn_row.addWidget(refresh_btn)
         root.addLayout(btn_row)
@@ -333,10 +311,10 @@ class UsageWindow(QDialog):
             self._table.setItem(row, 2, QTableWidgetItem(f"{rec['input_tokens']:,}"))
             ch = rec.get("cache_hit_tokens", 0)
             item_ch = QTableWidgetItem(f"{ch:,}" if ch else "—")
-            item_ch.setForeground(QColor("#b0608a") if ch else QColor("#c0b0c0"))
+            item_ch.setForeground(QColor("#d0842a") if ch else QColor("#c0b0c0"))
             self._table.setItem(row, 3, item_ch)
             self._table.setItem(row, 4, QTableWidgetItem(f"{rec['output_tokens']:,}"))
             self._table.setItem(row, 5, QTableWidgetItem(f"{rec['total_tokens']:,}"))
             cost_item = QTableWidgetItem(f"¥ {rec['cost']:.6f}")
-            cost_item.setForeground(QColor("#a78bfa"))
+            cost_item.setForeground(QColor("#7c6cf0"))
             self._table.setItem(row, 6, cost_item)

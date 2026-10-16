@@ -33,7 +33,7 @@ class DivinationWindow(QDialog):
         super().__init__(parent)
         self.record_id = record_id
         self._record = get_record(record_id)
-        self.setWindowTitle("🔮 算命结果")
+        self.setWindowTitle("🔮 决疑结果")
         self.setObjectName("divRoot")
         self.setStyleSheet(_QSS)
         self.resize(460, 600)
@@ -46,7 +46,7 @@ class DivinationWindow(QDialog):
         root.setContentsMargins(16, 14, 16, 14)
         root.setSpacing(10)
 
-        title = QLabel("🔮 算命结果")
+        title = QLabel("🔮 决疑结果")
         title.setObjectName("divTitle")
         root.addWidget(title)
 

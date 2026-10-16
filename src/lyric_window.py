@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""音乐窗口:网易云风格,歌词+进度条+播放列表(粉蓝渐变可爱风)。"""
-from PySide6.QtCore import Qt, QTimer, QSize
+"""音乐窗口:歌词+进度条+播放列表(可换插画背景,简约风)。"""
+from PySide6.QtCore import Qt, QTimer, QSize, QRectF
 from PySide6.QtGui import QPixmap, QIcon, QPainter, QPainterPath, QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QFrame, QScrollArea, QPushButton,
@@ -9,6 +9,9 @@ from PySide6.QtWidgets import (
 )
 
 from music_player import MusicPlayer
+
+# 背景图文件名(放在 音乐素材/ 下,用户可自行替换成自己的图)
+_BG_IMAGE = "背景-车窗少女.jpg"
 
 
 def _icon_dir():
@@ -97,6 +100,17 @@ class LyricWindow(QFrame):
         self._seeking = False
         self._show_playlist = False
 
+        # 背景插画(音乐素材/背景-车窗少女.jpg): 加载失败则保持原渐变主题
+        self._bg_pixmap = None
+        try:
+            bg_path = os.path.join(_asset_dir(), _BG_IMAGE)
+            if os.path.isfile(bg_path):
+                pm = QPixmap(bg_path)
+                if not pm.isNull():
+                    self._bg_pixmap = pm
+        except Exception:
+            self._bg_pixmap = None
+
         self._setup_ui()
         self._load_playlist()
 
@@ -111,50 +125,6 @@ class LyricWindow(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
-
-        # 顶部:封面占位 + 歌名(封面加柔和外环 + 内发光)
-        self._cover = QLabel("♫")
-        self._cover.setAlignment(Qt.AlignCenter)
-        self._cover.setFixedSize(160, 160)
-        self._cover.setStyleSheet("""
-            QLabel {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #ff9ec7, stop:0.55 #ff8ab5, stop:1 #9ec7ff);
-                border: 5px solid rgba(255,255,255,0.6);
-                border-radius: 80px;
-                font-size: 58px;
-                color: #fff;
-            }
-        """)
-        # 封面发光投影
-        _glow = QGraphicsDropShadowEffect(self._cover)
-        _glow.setBlurRadius(38)
-        _glow.setOffset(0, 8)
-        _glow.setColor(QColor(255, 130, 180, 110))
-        self._cover.setGraphicsEffect(_glow)
-        cover_row = QHBoxLayout()
-        cover_row.addStretch()
-        cover_row.addWidget(self._cover)
-        cover_row.addStretch()
-        layout.addLayout(cover_row)
-
-        # 装饰素材:优先用 exe 同目录的「音乐素材」(用户可自行替换),否则用打包进去的那份
-        import os
-        asset_dir = _asset_dir()
-
-        # 左下角星光装饰
-        self._deco_left = QLabel(self)
-        self._deco_left.setPixmap(QPixmap(os.path.join(asset_dir, "星光装饰.png")).scaled(200, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        self._deco_left.setStyleSheet("background:transparent;")
-        self._deco_left.move(0, self.height() - 200)
-        self._deco_left.lower()
-
-        # 右上角音符装饰
-        self._deco_right = QLabel(self)
-        self._deco_right.setPixmap(QPixmap(os.path.join(asset_dir, "音符装饰.png")).scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        self._deco_right.setStyleSheet("background:transparent;")
-        self._deco_right.move(self.width() - 70, 5)
-        self._deco_right.lower()
 
         # 歌名(加一点字母间距更精致)
         self._title = QLabel("未播放")
@@ -178,7 +148,7 @@ class LyricWindow(QFrame):
         lyric_scroll.setWidget(self._lyric_container)
         lyric_scroll.setWidgetResizable(True)
         lyric_scroll.setStyleSheet(
-            "border:none; background:rgba(255,255,255,0.55); border-radius:16px;")
+            "border:none; background:transparent; border-radius:16px;")
         lyric_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         layout.addWidget(lyric_scroll, 1)
         self._lyric_scroll = lyric_scroll  # 存成成员变量,用于滚动定位
@@ -227,8 +197,7 @@ class LyricWindow(QFrame):
         self._total_time = QLabel("00:00")
         for t in (self._cur_time, self._total_time):
             t.setStyleSheet(
-                "background: rgba(255,255,255,0.7); color:#b0608a;"
-                "border: 1px solid #f0d8e8; border-radius: 9px;"
+                "background:transparent; color:#b0608a;"
                 "padding: 2px 10px; font-size: 11px; font-weight: 600;"
             )
         time_row.addWidget(self._cur_time)
@@ -236,87 +205,50 @@ class LyricWindow(QFrame):
         time_row.addWidget(self._total_time)
         layout.addLayout(time_row)
 
-        # 按钮行
+        # 按钮行:纯白色文字符号(图标PNG自带白底,在深色背景上突兀,改用无底色符号)
         btn_row = QHBoxLayout()
         btn_row.setSpacing(20)
 
-        from PySide6.QtGui import QIcon
-        import os
-        icon_dir = _icon_dir()
+        self._list_btn = QPushButton("≡")
+        self._prev_btn = QPushButton("◀◀")
+        self._play_btn = QPushButton("▶")
+        self._next_btn = QPushButton("▶▶")
 
-        self._list_btn = QPushButton()
-        self._prev_btn = QPushButton()
-        self._play_btn = QPushButton()
-        self._next_btn = QPushButton()
-
-        self._list_btn.setIcon(QIcon(os.path.join(icon_dir, "list.png")))
-        self._list_btn.setIconSize(QSize(24, 24))
-        self._prev_btn.setIcon(QIcon(os.path.join(icon_dir, "prev.png")))
-        self._prev_btn.setIconSize(QSize(28, 28))
-        self._play_btn.setIcon(QIcon(os.path.join(icon_dir, "play.png")))
-        self._play_btn.setIconSize(QSize(36, 36))
-        self._next_btn.setIcon(QIcon(os.path.join(icon_dir, "next.png")))
-        self._next_btn.setIconSize(QSize(28, 28))
-
-        self._list_btn.setFixedSize(40, 40)
-        self._list_btn.setStyleSheet("""
+        # 极简按钮: 透明背景 + 白色符号, 只有悬停时一圈淡淡的白
+        _plain_btn_style = """
             QPushButton {
                 border: none;
                 background: transparent;
+                color: rgba(255,255,255,0.88);
+                font-family: "Segoe UI Symbol";
+                font-weight: 600;
             }
             QPushButton:hover {
-                background: rgba(255,228,239,0.6);
-                border-radius: 20px;
-            }
-        """)
-        self._list_btn.clicked.connect(self._toggle_playlist)
-
-        # 上一首/下一首:淡粉渐变圆钮
-        for btn in (self._prev_btn, self._next_btn):
-            btn.setFixedSize(46, 46)
-            btn.setStyleSheet("""
-                QPushButton {
-                    border: none;
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                        stop:0 #fff0f6, stop:1 #f0f4ff);
-                    border: 1.5px solid #f0d8e8;
-                    border-radius: 23px;
-                }
-                QPushButton:hover {
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                        stop:0 #ffe0ee, stop:1 #e0ecff);
-                    border: 1.5px solid #f0c8dc;
-                }
-                QPushButton:pressed {
-                    background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                        stop:0 #ffd4e8, stop:1 #d4e4ff);
-                }
-            """)
-
-        # 播放/暂停:粉蓝渐变主按钮,白色图标 + 发光
-        self._play_btn.setFixedSize(58, 58)
-        self._play_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 #ff7eb3, stop:0.5 #ff8ab5, stop:1 #8ec5ff);
-                border: 3px solid rgba(255,255,255,0.75);
-                border-radius: 29px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 #ff6da6, stop:0.5 #ff7aa8, stop:1 #7ab8ff);
+                background: rgba(255,255,255,0.2);
+                border-radius: 50%;
+                color: #ffffff;
             }
             QPushButton:pressed {
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:1,
-                    stop:0 #ff5c9c, stop:0.5 #ff6ea0, stop:1 #6aaaff);
+                background: rgba(255,255,255,0.4);
+                border-radius: 50%;
+                color: #ffffff;
             }
-        """)
-        _play_glow = QGraphicsDropShadowEffect(self._play_btn)
-        _play_glow.setBlurRadius(26)
-        _play_glow.setOffset(0, 5)
-        _play_glow.setColor(QColor(255, 130, 180, 120))
-        self._play_btn.setGraphicsEffect(_play_glow)
+        """
+        self._list_btn.setStyleSheet(_plain_btn_style)
+        self._list_btn.setStyleSheet(_plain_btn_style + "QPushButton { font-size: 20px; }")
+        for btn in (self._prev_btn, self._next_btn):
+            btn.setStyleSheet(_plain_btn_style + "QPushButton { font-size: 18px; }")
+        self._play_btn.setStyleSheet(_plain_btn_style + "QPushButton { font-size: 26px; }")
+
+        self._list_btn.setFixedSize(40, 40)
+        self._list_btn.clicked.connect(self._toggle_playlist)
+
+        # 上一首/下一首
+        for btn in (self._prev_btn, self._next_btn):
+            btn.setFixedSize(46, 46)
+
+        # 播放/暂停
+        self._play_btn.setFixedSize(58, 58)
 
         self._prev_btn.clicked.connect(self._on_prev)
         self._play_btn.clicked.connect(self._on_play_pause)
@@ -361,8 +293,6 @@ class LyricWindow(QFrame):
         self._lyric_labels = []
         if title:
             self._title.setText(title)
-        # 更新封面
-        self._update_cover(title)
         while self._lyric_layout.count():
             item = self._lyric_layout.takeAt(0)
             if item.widget():
@@ -374,71 +304,6 @@ class LyricWindow(QFrame):
             lbl.setStyleSheet("color:#9a8a9a; font-size:13px; padding:10px 12px; border-radius:10px;")
             self._lyric_layout.addWidget(lbl)
             self._lyric_labels.append(lbl)
-
-    def _round_cover(self, pm, side=150, border=4):
-        """把封面图裁成圆形,并等比放大居中填满,避免方形图片从圆框顶出来(重叠)。"""
-        if pm is None or pm.isNull():
-            return pm
-        inner = side - border * 2
-        out = QPixmap(side, side)
-        out.fill(Qt.transparent)
-        p = QPainter(out)
-        p.setRenderHint(QPainter.Antialiasing)
-        path = QPainterPath()
-        path.addEllipse(border, border, inner, inner)
-        p.setClipPath(path)
-        scaled = pm.scaled(inner, inner,
-                           Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-        x = (inner - scaled.width()) // 2
-        y = (inner - scaled.height()) // 2
-        p.drawPixmap(border + x, border + y, scaled)
-        p.end()
-        return out
-
-    def _update_cover(self, song_name):
-        """根据歌曲名查找同名封面图。"""
-        if not song_name:
-            return
-        import os
-        from paths import app_dir
-        music_dir = str(app_dir() / "音乐")
-        # 查找同名图片
-        for ext in [".jpg", ".jpeg", ".png"]:
-            cover_path = os.path.join(music_dir, song_name + ext)
-            if os.path.isfile(cover_path):
-                # 找到封面图:裁成圆形再显示
-                pix = self._round_cover(QPixmap(cover_path))
-                self._cover.setPixmap(pix)
-                self._cover.setText("")
-                self._cover.setStyleSheet("""
-                    QLabel {
-                        background: transparent;
-                        border: 0px;  /* 图片本身已带圆角,不再加圆边框 */
-                    }
-                """)
-                return
-        # 找不到封面,用默认小猫封面
-        import os
-        asset_dir = _asset_dir()
-        default_cover = os.path.join(asset_dir, "默认封面.png")
-        if os.path.isfile(default_cover):
-            pix = self._round_cover(QPixmap(default_cover))
-            self._cover.setPixmap(pix)
-            self._cover.setText("")
-            self._cover.setStyleSheet("QLabel { background: transparent; border: 0px; }")
-        else:
-            # 实在没有就用渐变占位(渐变本身是圆的,保留圆边框)
-            self._cover.setText("♫")
-            self._cover.setStyleSheet("""
-                QLabel {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                        stop:0 #ff9ec7, stop:0.55 #ff8ab5, stop:1 #9ec7ff);
-                    border: 4px solid rgba(255,255,255,0.55);
-                    border-radius: 75px;
-                    font-size: 56px;
-                    color: #fff;
-                }
-            """)
 
     def _on_prev(self):
         mp = MusicPlayer.get()
@@ -457,13 +322,10 @@ class LyricWindow(QFrame):
         self.set_lyrics(mp._lyrics, mp.current_song_name)
 
     def _on_state_changed(self, playing):
-        from PySide6.QtGui import QIcon
-        import os
-        icon_dir = _icon_dir()
         if playing:
-            self._play_btn.setIcon(QIcon(os.path.join(icon_dir, "pause.png")))
+            self._play_btn.setText("❚❚")
         else:
-            self._play_btn.setIcon(QIcon(os.path.join(icon_dir, "play.png")))
+            self._play_btn.setText("▶")
         mp = MusicPlayer.get()
         if mp.current_song_name:
             self._title.setText(mp.current_song_name)
@@ -554,3 +416,22 @@ class LyricWindow(QFrame):
             # 滚动到当前歌词
             lbl = self._lyric_labels[current_idx]
             self._lyric_scroll.ensureWidgetVisible(lbl)
+
+    # ── 插画背景 ──
+    def paintEvent(self, event):
+        """有背景图时画插画铺满窗口(圆角裁剪 + 等比放大居中,不叠遮罩)。"""
+        if self._bg_pixmap is None or self._bg_pixmap.isNull():
+            super().paintEvent(event)
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 22, 22)
+        p.setClipPath(path)
+        w, h = self.width(), self.height()
+        scaled = self._bg_pixmap.scaled(
+            w, h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        x = (w - scaled.width()) // 2
+        y = (h - scaled.height()) // 2
+        p.drawPixmap(x, y, scaled)
+        p.end()

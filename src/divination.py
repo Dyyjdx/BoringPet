@@ -63,7 +63,7 @@ def _cast_raw(div_type, question):
     if div_type == "bazi":
         birth = (cfg.get("birth") or "").strip()
         if not birth:
-            raise ValueError("还没设置出生时间：请打开 宠物设置 → 算命 → 填公历生日（示例 2006-02-26T15:40）")
+            raise ValueError("还没设置出生时间：请打开 宠物设置 → 决疑 → 填公历生日（示例 2006-02-26T15:40）")
         try:
             from oraclebone.bazi import cast
             return cast(birth, timezone="Asia/Shanghai")

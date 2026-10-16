@@ -84,6 +84,10 @@ hiddenimports = [
     "mutagen.oggvorbis",
     "mutagen.wave",
     "bleak",
+    # qfluentwidgets(Fluent 设置窗口)及其无边框窗口依赖
+    "qfluentwidgets",
+    "qframelesswindow",
+    "darkdetect",
 ]
 
 # ---------------------------------------------------------------- 排除

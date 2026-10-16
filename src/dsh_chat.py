@@ -31,7 +31,21 @@ SESSION_FILE = str(app_dir() / "dsh_session.json")
 DSH_CWD = str(app_dir())
 # 本机 DSH 配置:优先读环境变量,其次在 PATH 里找 dsh,最后退回本机常见安装位置
 # (写死绝对路径会导致别人拿到项目后这个通道直接不可用)
-DSH_HOME = os.environ.get("DSH_HOME") or r"D:\deepseek-harness\dsh-data"
+def _detect_dsh_home():
+    """定位 DSH 数据目录:环境变量 DSH_HOME 优先,失效则回退 ~/.dsh(桌面版默认)。"""
+    env = os.environ.get("DSH_HOME")
+    if env and os.path.isdir(env):
+        return env
+    home_dsh = os.path.join(os.path.expanduser("~"), ".dsh")
+    if os.path.isdir(home_dsh):
+        return home_dsh
+    legacy = r"D:\deepseek-harness\dsh-data"
+    if os.path.isdir(legacy):
+        return legacy
+    return env or legacy  # 都没有时退回原值, 让 SDK 报更明确的错
+
+
+DSH_HOME = _detect_dsh_home()
 DSH_BIN = os.environ.get("DSH_BIN") or shutil.which("dsh") or r"D:\Anaconda\Scripts\dsh.exe"
 DSH_MODEL = "deepseek-v4-flash"
 

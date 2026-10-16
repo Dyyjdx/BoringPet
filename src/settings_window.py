@@ -1,13 +1,26 @@
 # -*- coding: utf-8 -*-
-"""设置窗口:粉蓝可爱风,配置桌宠外观/身份/AI对话/主动功能。"""
+"""设置窗口:qfluentwidgets Fluent 风格,配置桌宠外观/身份/AI对话/主动功能。
+
+对外接口保持不变(供 pet.py / chat_window.py 使用):
+  SettingsWindow(QDialog)  settings_saved 信号
+  load_settings / save_settings / ensure_settings_file
+  build_pet_identity / detect_relationship_mode
+  PROVIDERS / DEFAULT_SETTINGS / SETTINGS_FILE
+"""
 import json
 import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QFrame, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton, QRadioButton, QScrollArea,
-                               QSlider, QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QDialog, QFrame, QHBoxLayout,
+                               QLabel, QPushButton, QScrollArea, QTextEdit,
+                               QVBoxLayout, QWidget)
+
+from qfluentwidgets import (
+    FluentIcon, LineEdit, ComboBox, Slider, SwitchButton, RadioButton,
+    PushButton, PrimaryPushButton, SettingCard, SettingCardGroup, setTheme,
+    Theme,
+)
 
 from paths import app_dir
 
@@ -118,7 +131,7 @@ DEFAULT_SETTINGS = {
         "game_comment_min_minutes": 2,
         "game_comment_max_minutes": 10,
         "idle_longing_threshold": 0.45,
-        "idle_max_hours": 4,
+        "idle_max_hours": 8,
         "hr_alert_threshold": 115,
         "hr_alert_interval_min": 2,
         "recording_threshold": 105,
@@ -140,48 +153,12 @@ DEFAULT_SETTINGS = {
         "model": "text-embedding-v4",
         "model_used": "",
     },
+    "dsh": {
+        # DSH 数据根目录(含 sessions 子目录), 留空则自动检测:
+        #   环境变量 DSH_HOME -> ~/.dsh -> 旧路径
+        "data_dir": "",
+    },
 }
-
-SETTINGS_QSS = """
-QWidget#settingsRoot { background:#f5f8ff; }
-QFrame#card { background:#ffffff; border:1px solid #e0e8f8; border-radius:12px; }
-QLabel#cardTitle { color:#2a3a5a; font-size:14px; font-weight:700; }
-QLabel { color:#5a6a8a; font-size:12px; }
-QLineEdit { background:#ffffff; border:1px solid #d0dcf0; border-radius:8px; padding:7px 10px;
-             font-size:12px; color:#2a3a5a; }
-QLineEdit:focus { border:1px solid #7ba8ff; }
-QTextEdit { background:#ffffff; border:1px solid #d0dcf0; border-radius:8px; padding:7px 10px;
-            font-size:12px; color:#2a3a5a; }
-QTextEdit:focus { border:1px solid #7ba8ff; }
-QComboBox { background:#ffffff; border:1px solid #d0dcf0; border-radius:8px; padding:7px 10px;
-            font-size:12px; color:#2a3a5a; min-height:18px; }
-QComboBox:hover { background:#eef2ff; }
-QPushButton#sizeBtn { background:#f0f4ff; color:#5a6a8a; border:1px solid #d0dcf0; border-radius:8px;
-                      padding:6px 14px; font-size:12px; font-weight:600; }
-QPushButton#sizeBtn:checked { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #7ba8ff, stop:1 #f090bc);
-                               color:#ffffff; border:none; }
-QPushButton#saveBtn { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #7ba8ff, stop:1 #f090bc);
-                      color:#ffffff; border:none; border-radius:10px; padding:8px 28px;
-                      font-size:13px; font-weight:600; }
-QPushButton#saveBtn:hover { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #8bb5ff, stop:1 #f5a0c8); }
-QPushButton#cancelBtn { background:transparent; color:#8a9ab8; border:1px solid #d0dcf0; border-radius:10px;
-                        padding:8px 20px; font-size:13px; }
-QPushButton#cancelBtn:hover { background:#eef2ff; }
-QRadioButton { color:#5a6a8a; font-size:12px; spacing:6px; }
-QRadioButton::indicator { width:14px; height:14px; border-radius:7px; border:2px solid #c0d0f0; }
-QRadioButton::indicator:checked { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #7ba8ff, stop:1 #f090bc);
-                                    border:2px solid #ffffff; }
-QSlider::groove:horizontal { height:4px; background:#e0e8f8; border-radius:2px; }
-QSlider::handle:horizontal { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #7ba8ff, stop:1 #f090bc);
-                              width:14px; height:14px; margin:-5px 0; border-radius:7px; border:2px solid #ffffff; }
-QSlider::sub-page:horizontal { background:qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #7ba8ff, stop:1 #f090bc);
-                                 border-radius:2px; }
-QScrollArea { border:none; background:transparent; }
-QScrollBar:vertical { background:transparent; width:6px; margin:2px; }
-QScrollBar::handle:vertical { background:#d0dcf0; border-radius:3px; min-height:20px; }
-QScrollBar::handle:vertical:hover { background:#b8c8f0; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }
-"""
 
 
 _bootstrapped = False
@@ -237,45 +214,38 @@ def save_settings(settings):
         return False
 
 
-def _card(title):
-    """创建一个卡片容器。"""
-    card = QFrame()
-    card.setObjectName("card")
-    lay = QVBoxLayout(card)
-    lay.setContentsMargins(14, 12, 14, 12)
-    lay.setSpacing(8)
-    t = QLabel(title)
-    t.setObjectName("cardTitle")
-    lay.addWidget(t)
-    return card, lay
-
-
-def _label(text):
-    l = QLabel(text)
-    return l
-
-
-class NoScrollComboBox(QComboBox):
+class NoScrollComboBox(ComboBox):
     """禁用滚轮切换的下拉框。"""
     def wheelEvent(self, e):
         e.ignore()
 
 
+def _card_edit(placeholder="", width=230):
+    """Fluent LineEdit:设置卡片右侧的输入框。"""
+    edit = LineEdit()
+    edit.setPlaceholderText(placeholder)
+    edit.setFixedWidth(width)
+    return edit
+
+
 class SettingsWindow(QDialog):
-    """设置窗口。"""
+    """设置窗口(Fluent 风格)。"""
     settings_saved = Signal(dict)  # 保存后发出,携带新配置
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("设置")
-        self.setObjectName("settingsRoot")
-        self.setStyleSheet(SETTINGS_QSS)
-        self.resize(560, 900)
-        self.setMinimumSize(500, 750)
+        self.resize(640, 920)
+        self.setMinimumSize(580, 760)
+
+        # 统一 Fluent 浅色主题(仅影响 qfluentwidgets 组件,桌宠本体自绘不受影响)
+        setTheme(Theme.LIGHT)
 
         self._settings = load_settings()
         self._build_ui()
         self._fill_values()
+
+    # ────────────────────────── UI 构建 ──────────────────────────
 
     def _build_ui(self):
         root = QVBoxLayout(self)
@@ -284,11 +254,13 @@ class SettingsWindow(QDialog):
 
         # 标题栏
         title_bar = QFrame()
-        title_bar.setStyleSheet("background:#ffffff; border-bottom:1px solid #e0e8f8;")
+        title_bar.setFixedHeight(56)
         tl = QHBoxLayout(title_bar)
-        tl.setContentsMargins(20, 14, 20, 14)
+        tl.setContentsMargins(24, 0, 24, 0)
         title = QLabel("设置")
-        title.setStyleSheet("color:#2a3a5a; font-size:18px; font-weight:800;")
+        title.setStyleSheet(
+            "font-size:20px;font-weight:700;color:#1f1f1f;background:transparent;"
+        )
         tl.addWidget(title)
         tl.addStretch()
         root.addWidget(title_bar)
@@ -296,276 +268,301 @@ class SettingsWindow(QDialog):
         # 滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
         content = QWidget()
-        content.setObjectName("settingsRoot")
         cl = QVBoxLayout(content)
-        cl.setContentsMargins(12, 12, 12, 12)
+        cl.setContentsMargins(16, 8, 16, 16)
         cl.setSpacing(10)
 
         # ── 1. 桌宠外观 ──
-        card1, lay1 = _card("桌宠外观")
-        # 大小
-        lay1.addWidget(_label("大小"))
-        size_row = QHBoxLayout()
-        size_row.setSpacing(8)
+        g1 = SettingCardGroup("桌宠外观", content)
+        c_size = SettingCard(FluentIcon.ZOOM, "大小", "桌宠尺寸")
+        self._size_row = QHBoxLayout()
+        self._size_row.setSpacing(6)
         self._size_group = QButtonGroup(self)
         for txt, h in [("小", 150), ("中", 220), ("大", 300), ("超大", 380)]:
             btn = QPushButton(txt)
-            btn.setObjectName("sizeBtn")
             btn.setCheckable(True)
             btn.setProperty("size_h", h)
+            btn.setStyleSheet(
+                "QPushButton{border:1px solid #d0d0d0;border-radius:6px;padding:5px 14px;"
+                "background:transparent;color:#333;}"
+                "QPushButton:hover{background:#f0f0f0;}"
+                "QPushButton:checked{background:#2b7ff5;color:white;border:none;}"
+            )
             self._size_group.addButton(btn)
-            size_row.addWidget(btn)
-        size_row.addStretch()
-        lay1.addLayout(size_row)
-        # 透明度
-        op_row = QHBoxLayout()
-        op_row.setSpacing(12)
-        op_row.addWidget(_label("透明度"))
-        self._op_slider = QSlider(Qt.Horizontal)
+            self._size_row.addWidget(btn)
+        self._size_row.addStretch()
+        c_size.hBoxLayout.addLayout(self._size_row)
+        g1.addSettingCard(c_size)
+
+        c_op = SettingCard(FluentIcon.TRANSPARENT, "透明度", "不透明度")
+        self._op_slider = Slider(Qt.Horizontal)
         self._op_slider.setRange(20, 100)
+        self._op_slider.setFixedWidth(220)
         self._op_label = QLabel("100%")
-        self._op_label.setStyleSheet("color:#7ba8ff; font-size:13px; font-weight:600; min-width:40px;")
+        self._op_label.setStyleSheet("color:#2b7ff5;font-size:13px;font-weight:600;min-width:44px;")
         self._op_slider.valueChanged.connect(lambda v: self._op_label.setText(f"{v}%"))
-        op_row.addWidget(self._op_slider, 1)
-        op_row.addWidget(self._op_label)
-        lay1.addLayout(op_row)
-        cl.addWidget(card1)
+        c_op.hBoxLayout.addWidget(self._op_slider)
+        c_op.hBoxLayout.addWidget(self._op_label)
+        g1.addSettingCard(c_op)
+        cl.addWidget(g1)
 
         # ── 2. 桌宠身份 ──
-        card2, lay2 = _card("桌宠身份")
-        # 名字
-        lay2.addWidget(_label("桌宠名字"))
-        self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("给你的宠物起个名字")
-        lay2.addWidget(self._name_edit)
-        # 主人称呼
-        lay2.addWidget(_label("对你的称呼"))
-        self._owner_edit = QLineEdit()
-        self._owner_edit.setPlaceholderText("它怎么叫你？比如：主人、老公、名字")
-        lay2.addWidget(self._owner_edit)
-        # 人设描述
-        lay2.addWidget(_label("人设描述"))
+        g2 = SettingCardGroup("桌宠身份", content)
+        c_name = SettingCard(FluentIcon.EDIT, "桌宠名字", "给你的宠物起个名字")
+        self._name_edit = _card_edit()
+        c_name.hBoxLayout.addWidget(self._name_edit)
+        g2.addSettingCard(c_name)
+
+        c_owner = SettingCard(FluentIcon.PEOPLE, "对你的称呼", "它怎么叫你?比如:主人、名字")
+        self._owner_edit = _card_edit()
+        c_owner.hBoxLayout.addWidget(self._owner_edit)
+        g2.addSettingCard(c_owner)
+
+        c_persona = SettingCard(FluentIcon.QUICK_NOTE, "人设描述", "性格、说话风格、身份设定")
         self._persona_edit = QTextEdit()
         self._persona_edit.setPlaceholderText("描述它的性格、说话风格、身份设定…")
-        self._persona_edit.setFixedHeight(70)
-        lay2.addWidget(self._persona_edit)
-        cl.addWidget(card2)
+        self._persona_edit.setFixedSize(240, 70)
+        self._persona_edit.setStyleSheet(
+            "QTextEdit{border:1px solid #d0d0d0;border-radius:6px;padding:6px;"
+            "background:white;color:#333;font-size:13px;}"
+            "QTextEdit:focus{border:1px solid #2b7ff5;}"
+        )
+        c_persona.hBoxLayout.addWidget(self._persona_edit)
+        g2.addSettingCard(c_persona)
+        cl.addWidget(g2)
 
         # ── 3. AI 对话 ──
-        card3, lay3 = _card("AI 对话")
-        # 模式
-        lay3.addWidget(_label("对话模式"))
-        mode_row = QHBoxLayout()
-        mode_row.setSpacing(20)
+        g3 = SettingCardGroup("AI 对话", content)
+        c_mode = SettingCard(FluentIcon.ROBOT, "对话模式", "DSH 有工具能力;直连 API 简单对话")
+        self._mode_row = QHBoxLayout()
+        self._mode_row.setSpacing(12)
         self._mode_group = QButtonGroup(self)
-        self._rb_openclaw = QRadioButton("DSH（本地 agent，有工具能力）")
-        self._rb_direct = QRadioButton("直连 API（简单对话，不需要 DSH）")
+        self._rb_openclaw = RadioButton("DSH（本地 agent，有工具能力）")
+        self._rb_direct = RadioButton("直连 API（简单对话）")
         self._mode_group.addButton(self._rb_openclaw)
         self._mode_group.addButton(self._rb_direct)
-        mode_row.addWidget(self._rb_openclaw)
-        mode_row.addWidget(self._rb_direct)
-        mode_row.addStretch()
-        lay3.addLayout(mode_row)
-        # 直连配置容器
-        self._direct_frame = QFrame()
-        self._direct_frame.setStyleSheet("background:transparent;")
-        dl = QVBoxLayout(self._direct_frame)
-        dl.setContentsMargins(0, 8, 0, 0)
-        dl.setSpacing(10)
-        # 提供商
-        dl.addWidget(_label("模型提供商"))
+        self._mode_row.addWidget(self._rb_openclaw)
+        self._mode_row.addWidget(self._rb_direct)
+        self._mode_row.addStretch()
+        c_mode.hBoxLayout.addLayout(self._mode_row)
+        g3.addSettingCard(c_mode)
+
+        # 直连配置容器(放在独立的卡片里,切换模式时隐藏)
+        self._direct_card = SettingCard(FluentIcon.SETTING, "直连配置", "提供商 / API Key / 模型")
+        dl = QVBoxLayout()
+        dl.setContentsMargins(0, 4, 0, 0)
+        dl.setSpacing(8)
+
+        prov_row = QHBoxLayout()
+        prov_row.addWidget(QLabel("模型提供商"))
         self._chat_provider = NoScrollComboBox()
         for key, p in PROVIDERS.items():
             self._chat_provider.addItem(p["label"], key)
+        self._chat_provider.setFixedWidth(230)
         self._chat_provider.currentIndexChanged.connect(self._on_chat_provider_change)
-        # 修复下拉列表透明问题
-        view = self._chat_provider.view()
-        view.setAutoFillBackground(True)
-        view.setStyleSheet("""
-            QListView { background:#ffffff; border:1px solid #d0dcf0; }
-            QListView::item { padding:8px 12px; color:#2a3a5a; }
-            QListView::item:selected { background:#eef2ff; color:#2a3a5a; }
-        """)
-        dl.addWidget(self._chat_provider)
-        # API Key
-        dl.addWidget(_label("API Key"))
-        self._chat_key = QLineEdit()
-        self._chat_key.setPlaceholderText("sk-...")
-        dl.addWidget(self._chat_key)
-        # 模型名(只读显示)
+        prov_row.addWidget(self._chat_provider)
+        prov_row.addStretch()
+        dl.addLayout(prov_row)
+
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("API Key"))
+        self._chat_key = _card_edit("sk-...")
+        key_row.addWidget(self._chat_key)
+        key_row.addStretch()
+        dl.addLayout(key_row)
+
         self._chat_model_label = QLabel("")
-        self._chat_model_label.setStyleSheet("color:#7ba8ff; font-size:12px; background:transparent; padding:2px 0;")
+        self._chat_model_label.setStyleSheet("color:#2b7ff5;font-size:12px;background:transparent;")
         dl.addWidget(self._chat_model_label)
+
         # 自定义提供商时才显示的可编辑区
         self._chat_custom_frame = QFrame()
         self._chat_custom_frame.setStyleSheet("background:transparent;")
         ccl = QVBoxLayout(self._chat_custom_frame)
-        ccl.setContentsMargins(0, 6, 0, 0)
+        ccl.setContentsMargins(0, 4, 0, 0)
         ccl.setSpacing(8)
-        ccl.addWidget(_label("模型名"))
-        self._chat_model = QLineEdit()
-        ccl.addWidget(self._chat_model)
-        ccl.addWidget(_label("API 地址（base_url）"))
-        self._chat_base_url = QLineEdit()
-        self._chat_base_url.setPlaceholderText("https://api.example.com/v1")
-        ccl.addWidget(self._chat_base_url)
+        m_row = QHBoxLayout()
+        m_row.addWidget(QLabel("模型名"))
+        self._chat_model = _card_edit()
+        m_row.addWidget(self._chat_model)
+        m_row.addStretch()
+        ccl.addLayout(m_row)
+        b_row = QHBoxLayout()
+        b_row.addWidget(QLabel("API 地址"))
+        self._chat_base_url = _card_edit("https://api.example.com/v1", width=260)
+        b_row.addWidget(self._chat_base_url)
+        b_row.addStretch()
+        ccl.addLayout(b_row)
         dl.addWidget(self._chat_custom_frame)
-        lay3.addWidget(self._direct_frame)
-        # 模式切换显示/隐藏直连配置
-        self._rb_openclaw.toggled.connect(lambda on: self._direct_frame.setVisible(not on))
-        cl.addWidget(card3)
+
+        self._direct_card.setLayout(dl)
+        g3.addSettingCard(self._direct_card)
+
+        # DSH 数据目录(留空自动检测, 用于 DSH 任务完成气泡提醒)
+        self._dsh_data_dir_edit = _card_edit("", 280)
+        c_dsh = SettingCard(FluentIcon.FOLDER, "DSH 数据目录", "留空自动检测（DSH_HOME / ~/.dsh）")
+        c_dsh.hBoxLayout.addWidget(self._dsh_data_dir_edit)
+        g3.addSettingCard(c_dsh)
+
+        self._rb_openclaw.toggled.connect(lambda on: self._direct_card.setVisible(not on))
+        cl.addWidget(g3)
 
         # ── 4. 主动功能 ──
-        card4, lay4 = _card("主动功能（识图/双击评论/心率关心）")
-        # 提供商
-        lay4.addWidget(_label("模型提供商"))
+        g4 = SettingCardGroup("主动功能（识图/双击评论/心率关心）", content)
+        c_ap = SettingCard(FluentIcon.MEGAPHONE, "模型提供商", "主动说话/识图用")
+        ap_row = QHBoxLayout()
         self._active_provider = NoScrollComboBox()
         for key, p in PROVIDERS.items():
             self._active_provider.addItem(p["label"], key)
+        self._active_provider.setFixedWidth(230)
         self._active_provider.currentIndexChanged.connect(self._on_active_provider_change)
-        # 修复下拉列表透明问题
-        view = self._active_provider.view()
-        view.setAutoFillBackground(True)
-        view.setStyleSheet("""
-            QListView { background:#ffffff; border:1px solid #d0dcf0; }
-            QListView::item { padding:8px 12px; color:#2a3a5a; }
-            QListView::item:selected { background:#eef2ff; color:#2a3a5a; }
-        """)
-        lay4.addWidget(self._active_provider)
-        # API Key
-        lay4.addWidget(_label("API Key"))
-        self._active_key = QLineEdit()
-        self._active_key.setPlaceholderText("sk-...")
-        lay4.addWidget(self._active_key)
-        # 模型名(只读显示)
+        ap_row.addWidget(self._active_provider)
+        ap_row.addStretch()
+        c_ap.hBoxLayout.addLayout(ap_row)
+        g4.addSettingCard(c_ap)
+
+        c_ak = SettingCard(FluentIcon.CERTIFICATE, "API Key", "sk-...")
+        self._active_key = _card_edit()
+        c_ak.hBoxLayout.addWidget(self._active_key)
+        g4.addSettingCard(c_ak)
+
         self._active_model_label = QLabel("")
-        self._active_model_label.setStyleSheet("color:#7ba8ff; font-size:12px; background:transparent; padding:2px 0;")
-        lay4.addWidget(self._active_model_label)
-        # 自定义提供商时才显示的可编辑区
+        self._active_model_label.setStyleSheet("color:#2b7ff5;font-size:12px;background:transparent;")
+        self._active_model_card = SettingCard(FluentIcon.INFO, "默认模型", "识图 / 说话模型")
+        self._active_model_card.hBoxLayout.addWidget(self._active_model_label)
+        g4.addSettingCard(self._active_model_card)
+
         self._active_custom_frame = QFrame()
         self._active_custom_frame.setStyleSheet("background:transparent;")
         cfl = QVBoxLayout(self._active_custom_frame)
-        cfl.setContentsMargins(0, 6, 0, 0)
+        cfl.setContentsMargins(0, 4, 0, 0)
         cfl.setSpacing(8)
-        cfl.addWidget(_label("识图模型"))
-        self._vision_model = QLineEdit()
-        cfl.addWidget(self._vision_model)
-        cfl.addWidget(_label("说话模型"))
-        self._text_model = QLineEdit()
-        cfl.addWidget(self._text_model)
-        cfl.addWidget(_label("API 地址（base_url）"))
-        self._active_base_url = QLineEdit()
-        self._active_base_url.setPlaceholderText("https://api.example.com/v1")
-        cfl.addWidget(self._active_base_url)
-        lay4.addWidget(self._active_custom_frame)
-        cl.addWidget(card4)
+        v_row = QHBoxLayout()
+        v_row.addWidget(QLabel("识图模型"))
+        self._vision_model = _card_edit()
+        v_row.addWidget(self._vision_model)
+        v_row.addStretch()
+        cfl.addLayout(v_row)
+        t_row = QHBoxLayout()
+        t_row.addWidget(QLabel("说话模型"))
+        self._text_model = _card_edit()
+        t_row.addWidget(self._text_model)
+        t_row.addStretch()
+        cfl.addLayout(t_row)
+        ab_row = QHBoxLayout()
+        ab_row.addWidget(QLabel("API 地址"))
+        self._active_base_url = _card_edit("https://api.example.com/v1", width=260)
+        ab_row.addWidget(self._active_base_url)
+        ab_row.addStretch()
+        cfl.addLayout(ab_row)
+
+        self._active_custom_card = SettingCard(FluentIcon.CODE, "自定义配置", "模型名与 API 地址")
+        self._active_custom_card.setLayout(cfl)
+        g4.addSettingCard(self._active_custom_card)
+        cl.addWidget(g4)
 
         # ── 5. 评论与心率设置 ──
-        card5, lay5 = _card("评论与心率设置")
-        # 游戏评论间隔(随机)
-        lay5.addWidget(_label("游戏内评论最小间隔（分钟）"))
-        self._game_comment_min_edit = QLineEdit()
-        self._game_comment_min_edit.setPlaceholderText("2")
-        lay5.addWidget(self._game_comment_min_edit)
-        lay5.addWidget(_label("游戏内评论最大间隔（分钟）"))
-        self._game_comment_max_edit = QLineEdit()
-        self._game_comment_max_edit.setPlaceholderText("10")
-        lay5.addWidget(self._game_comment_max_edit)
-        # 平时主动: 驱力驱动(想念值), 无固定定时
-        lay5.addWidget(_label("平时想念阈值（0~1，越大越难主动）"))
-        self._idle_threshold_edit = QLineEdit()
-        self._idle_threshold_edit.setPlaceholderText("0.45（约3小时不理她会想你）")
-        lay5.addWidget(self._idle_threshold_edit)
-        lay5.addWidget(_label("平时保底时间（小时，超时必主动）"))
-        self._idle_max_hours_edit = QLineEdit()
-        self._idle_max_hours_edit.setPlaceholderText("4")
-        lay5.addWidget(self._idle_max_hours_edit)
-        # 心率关心阈值
-        lay5.addWidget(_label("心率关心阈值（bpm）"))
-        self._hr_threshold_edit = QLineEdit()
-        self._hr_threshold_edit.setPlaceholderText("115")
-        lay5.addWidget(self._hr_threshold_edit)
-        # 录屏阈值
-        lay5.addWidget(_label("自动录屏阈值（bpm）"))
-        self._rec_threshold_edit = QLineEdit()
-        self._rec_threshold_edit.setPlaceholderText("105")
-        lay5.addWidget(self._rec_threshold_edit)
-        # 心率关心间隔
-        lay5.addWidget(_label("心率关心间隔（分钟）"))
-        self._hr_interval_edit = QLineEdit()
-        self._hr_interval_edit.setPlaceholderText("2")
-        lay5.addWidget(self._hr_interval_edit)
-        cl.addWidget(card5)
+        g5 = SettingCardGroup("评论与心率设置", content)
+        self._game_comment_min_edit = _card_edit("2", 120)
+        c_gmin = SettingCard(FluentIcon.STOP_WATCH, "游戏评论最小间隔", "分钟")
+        c_gmin.hBoxLayout.addWidget(self._game_comment_min_edit)
+        g5.addSettingCard(c_gmin)
+
+        self._game_comment_max_edit = _card_edit("10", 120)
+        c_gmax = SettingCard(FluentIcon.STOP_WATCH, "游戏评论最大间隔", "分钟")
+        c_gmax.hBoxLayout.addWidget(self._game_comment_max_edit)
+        g5.addSettingCard(c_gmax)
+
+        self._idle_threshold_edit = _card_edit("0.45", 120)
+        c_it = SettingCard(FluentIcon.SPEED_MEDIUM, "平时想念阈值", "0~1，越大越难主动")
+        c_it.hBoxLayout.addWidget(self._idle_threshold_edit)
+        g5.addSettingCard(c_it)
+
+        self._idle_max_hours_edit = _card_edit("8", 120)
+        c_im = SettingCard(FluentIcon.DATE_TIME, "平时保底时间", "小时，超时必主动")
+        c_im.hBoxLayout.addWidget(self._idle_max_hours_edit)
+        g5.addSettingCard(c_im)
+
+        self._hr_threshold_edit = _card_edit("115", 120)
+        c_ht = SettingCard(FluentIcon.HEART, "心率关心阈值", "bpm")
+        c_ht.hBoxLayout.addWidget(self._hr_threshold_edit)
+        g5.addSettingCard(c_ht)
+
+        self._rec_threshold_edit = _card_edit("105", 120)
+        c_rt = SettingCard(FluentIcon.VIDEO, "自动录屏阈值", "bpm")
+        c_rt.hBoxLayout.addWidget(self._rec_threshold_edit)
+        g5.addSettingCard(c_rt)
+
+        self._hr_interval_edit = _card_edit("2", 120)
+        c_hi = SettingCard(FluentIcon.STOP_WATCH, "心率关心间隔", "分钟")
+        c_hi.hBoxLayout.addWidget(self._hr_interval_edit)
+        g5.addSettingCard(c_hi)
+        cl.addWidget(g5)
 
         # ── 6. 记忆向量模型 ──
-        card6, lay6 = _card("记忆向量模型（语义检索）")
-        lay6.addWidget(_label("API Key"))
-        self._vector_key = QLineEdit()
-        self._vector_key.setPlaceholderText("sk-...（不填则复用 AI 对话的 key）")
-        lay6.addWidget(self._vector_key)
-        lay6.addWidget(_label("向量模型名"))
-        self._vector_model = QLineEdit()
-        self._vector_model.setPlaceholderText("text-embedding-v4（阿里百炼）")
-        lay6.addWidget(self._vector_model)
-        lay6.addWidget(_label("API 地址（base_url）"))
-        self._vector_base_url = QLineEdit()
-        self._vector_base_url.setPlaceholderText("https://dashscope.aliyuncs.com/compatible-mode/v1")
-        lay6.addWidget(self._vector_base_url)
-        tip = QLabel("用于记忆的语义检索（回忆相似对话）。换模型后会自动重新向量化旧记忆，无需手动操作。")
-        tip.setStyleSheet("color:#8a9ab8; font-size:11px;")
-        tip.setWordWrap(True)
-        lay6.addWidget(tip)
-        cl.addWidget(card6)
+        g6 = SettingCardGroup("记忆向量模型（语义检索）", content)
+        self._vector_key = _card_edit("sk-...（不填则复用 AI 对话的 key）", 260)
+        c_vk = SettingCard(FluentIcon.CERTIFICATE, "API Key", "向量服务密钥")
+        c_vk.hBoxLayout.addWidget(self._vector_key)
+        g6.addSettingCard(c_vk)
 
-        # ── 7. 算命设置 ──
-        card7, lay7 = _card("算命（塔罗/六爻/小六壬/八字）")
-        # 默认牌阵
-        lay7.addWidget(_label("塔罗默认牌阵"))
+        self._vector_model = _card_edit("text-embedding-v4", 230)
+        c_vm = SettingCard(FluentIcon.SEARCH, "向量模型名", "如 text-embedding-v4")
+        c_vm.hBoxLayout.addWidget(self._vector_model)
+        g6.addSettingCard(c_vm)
+
+        self._vector_base_url = _card_edit("https://dashscope.aliyuncs.com/compatible-mode/v1", 280)
+        c_vb = SettingCard(FluentIcon.LINK, "API 地址", "base_url")
+        c_vb.hBoxLayout.addWidget(self._vector_base_url)
+        g6.addSettingCard(c_vb)
+        cl.addWidget(g6)
+
+        # ── 7. 决疑设置 ──
+        g7 = SettingCardGroup("决疑（塔罗/六爻/小六壬/八字）", content)
         self._div_spread = NoScrollComboBox()
         for txt, key in [("三张（现状/阻碍/指引）", "three-card"), ("单张", "single"), ("决策四张", "decision")]:
             self._div_spread.addItem(txt, key)
-        view7 = self._div_spread.view()
-        view7.setAutoFillBackground(True)
-        view7.setStyleSheet("""
-            QListView { background:#ffffff; border:1px solid #d0dcf0; }
-            QListView::item { padding:8px 12px; color:#2a3a5a; }
-            QListView::item:selected { background:#eef2ff; color:#2a3a5a; }
-        """)
-        lay7.addWidget(self._div_spread)
-        # 逆位开关
-        self._div_reversals = QCheckBox("塔罗允许逆位")
-        self._div_reversals.setStyleSheet("QCheckBox { color:#5a6a8a; font-size:12px; }")
-        lay7.addWidget(self._div_reversals)
-        # 八字生日
-        lay7.addWidget(_label("八字生日（公历 ISO，如 2006-02-26T15:40）"))
-        self._div_birth = QLineEdit()
-        self._div_birth.setPlaceholderText("2006-02-26T15:40")
-        lay7.addWidget(self._div_birth)
-        # 待应验提醒
-        self._div_remind = QCheckBox("启动时提醒待应验的卦")
-        self._div_remind.setStyleSheet("QCheckBox { color:#5a6a8a; font-size:12px; }")
-        lay7.addWidget(self._div_remind)
-        cl.addWidget(card7)
+        self._div_spread.setFixedWidth(230)
+        c_ds = SettingCard(FluentIcon.CALENDAR, "塔罗默认牌阵", "抽牌张数")
+        c_ds.hBoxLayout.addWidget(self._div_spread)
+        g7.addSettingCard(c_ds)
 
-        # 保存按钮(放在滚动区域里)
-        save_row = QHBoxLayout()
-        save_row.addStretch()
-        self._save_btn = QPushButton("保存")
-        self._save_btn.setObjectName("saveBtn")
+        self._div_reversals = SwitchButton("允许")
+        c_dr = SettingCard(FluentIcon.SYNC, "塔罗允许逆位", "牌可倒置解读")
+        c_dr.hBoxLayout.addWidget(self._div_reversals)
+        g7.addSettingCard(c_dr)
+
+        self._div_birth = _card_edit("2006-02-26T15:40", 230)
+        c_db = SettingCard(FluentIcon.DATE_TIME, "八字生日", "公历 ISO，如 2006-02-26T15:40")
+        c_db.hBoxLayout.addWidget(self._div_birth)
+        g7.addSettingCard(c_db)
+
+        self._div_remind = SwitchButton("提醒")
+        c_dm = SettingCard(FluentIcon.RINGER, "启动时提醒待应验的卦", "打开桌宠时提示")
+        c_dm.hBoxLayout.addWidget(self._div_remind)
+        g7.addSettingCard(c_dm)
+        cl.addWidget(g7)
+
+        # 底部按钮
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self._save_btn = PrimaryPushButton("保存")
         self._save_btn.setFixedWidth(120)
         self._save_btn.clicked.connect(self._on_save)
-        save_row.addWidget(self._save_btn)
-        self._cancel_btn = QPushButton("取消")
-        self._cancel_btn.setObjectName("cancelBtn")
+        btn_row.addWidget(self._save_btn)
+        self._cancel_btn = PushButton("取消")
         self._cancel_btn.setFixedWidth(100)
         self._cancel_btn.clicked.connect(self.reject)
-        save_row.addWidget(self._cancel_btn)
-        cl.addLayout(save_row)
+        btn_row.addWidget(self._cancel_btn)
+        cl.addLayout(btn_row)
 
         cl.addStretch()
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
+
+    # ────────────────────────── 填值 ──────────────────────────
 
     def _fill_values(self):
         s = self._settings
@@ -581,10 +578,10 @@ class SettingsWindow(QDialog):
         # AI 对话
         if s["chat"]["mode"] == "dsh":
             self._rb_openclaw.setChecked(True)
-            self._direct_frame.setVisible(False)
+            self._direct_card.setVisible(False)
         else:
             self._rb_direct.setChecked(True)
-            self._direct_frame.setVisible(True)
+            self._direct_card.setVisible(True)
         idx = self._chat_provider.findData(s["chat"]["provider"])
         if idx >= 0:
             self._chat_provider.setCurrentIndex(idx)
@@ -623,6 +620,10 @@ class SettingsWindow(QDialog):
         self._vector_key.setText(vec.get("api_key", ""))
         self._vector_model.setText(vec.get("model", "text-embedding-v4"))
         self._vector_base_url.setText(vec.get("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1"))
+        # DSH 数据目录
+        self._dsh_data_dir_edit.setText((s.get("dsh") or {}).get("data_dir", ""))
+
+    # ────────────────────────── 交互 ──────────────────────────
 
     def _on_chat_provider_change(self):
         key = self._chat_provider.currentData()
@@ -649,10 +650,10 @@ class SettingsWindow(QDialog):
         default_t = t_models[0] if t_models else ""
         if is_custom:
             self._active_model_label.setText("请在下方填写模型名和 API 地址")
-            self._active_custom_frame.setVisible(True)
+            self._active_custom_card.setVisible(True)
         else:
             self._active_model_label.setText(f"识图：{default_v} ｜ 说话：{default_t}")
-            self._active_custom_frame.setVisible(False)
+            self._active_custom_card.setVisible(False)
             self._vision_model.setText(default_v)
             self._text_model.setText(default_t)
             self._active_base_url.setText(p.get("base_url", ""))
@@ -727,6 +728,9 @@ class SettingsWindow(QDialog):
         s["vector"]["api_key"] = self._vector_key.text().strip()
         s["vector"]["model"] = self._vector_model.text().strip() or "text-embedding-v4"
         s["vector"]["base_url"] = self._vector_base_url.text().strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # DSH 数据目录
+        s.setdefault("dsh", {})
+        s["dsh"]["data_dir"] = self._dsh_data_dir_edit.text().strip()
 
         if save_settings(s):
             self.settings_saved.emit(s)

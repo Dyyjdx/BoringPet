@@ -34,6 +34,7 @@ from paths import resource_dir, app_dir
 from screen_recorder import get_recorder, prewarm as prewarm_recorder
 from music_player import MusicPlayer
 from lyric_window import LyricWindow
+from dsh_watcher import DshWatcher
 
 GRAV = 1500.0     # 登场下落重力加速度(px/s^2)
 MAX_VY = 2600.0   # 下落最大速度(px/s)
@@ -248,6 +249,10 @@ class PetWindow(QWidget):
         self.heart = HeartManager()
         self.heart_win = None
         self._chat_win = None
+        # DSH 任务完成监听(后台线程, 检测 DSH 会话日志里的 turn/end)
+        self._dsh_watcher = DshWatcher(self)
+        self._dsh_watcher.task_done.connect(self._on_dsh_task_done)
+        self._dsh_watcher.start()
         # 悬浮录制按钮
         self._rec_btn = RecordButton()
         self._rec_btn.clicked.connect(self._toggle_record)
@@ -466,14 +471,17 @@ class PetWindow(QWidget):
             e.accept()
 
     def mouseDoubleClickEvent(self, e):
-        """双击桌宠:播放音乐时=下一首,否则=截屏分析。"""
+        """双击桌宠:播放音乐时=随机切歌,否则=截屏分析。"""
         if e.button() == Qt.LeftButton:
             if self._in_music_mode():
-                # 播放音乐时:双击=下一首
+                # 播放音乐时:双击=随机切歌
                 mp = MusicPlayer.get()
-                name = mp.next_song()
-                if name:
-                    self._show_bubble(f"下一首：{name}~", duration=3000)
+                if mp._playlist:
+                    mp._current_idx = random.randint(0, len(mp._playlist) - 1)
+                    mp._load_and_play()
+                    name = mp.current_song_name
+                    if name:
+                        self._show_bubble(f"随机播放：{name}~", duration=3000)
                 e.accept()
                 return
             if getattr(self, "_double_tap_busy", False):
@@ -574,29 +582,6 @@ class PetWindow(QWidget):
         rec_act.setChecked(self._recording_enabled)
         rec_act.toggled.connect(self._toggle_recording)
 
-        menu.addSeparator()
-        # 手动录屏(文字动态切换)
-        self._manual_rec_action = menu.addAction("开始录屏")
-        self._manual_rec_action.triggered.connect(self._toggle_record)
-        menu.aboutToShow.connect(self._update_menu_rec_text)
-
-        # 播放音乐
-        menu.addAction("播放音乐", self._music_play_pause)
-        menu.addAction("停止音乐", self._music_stop)
-
-        menu.addAction('AI 对话', self._open_chat)
-        menu.addAction('查看用量', self._open_usage)
-
-        # 算命
-        div = menu.addMenu('🔮 算命')
-        div.setStyleSheet(MENU_QSS)
-        div.addAction('塔罗', lambda: self._start_divination('tarot'))
-        div.addAction('六爻', lambda: self._start_divination('iching'))
-        div.addAction('小六壬', lambda: self._start_divination('xiaoliuren'))
-        div.addAction('八字', lambda: self._start_divination('bazi'))
-        div.addSeparator()
-        div.addAction('最近记录', self._open_div_recent)
-
         # 游戏优化(接入 MeoBoost 精简版)
         gb = menu.addMenu('游戏优化')
         gb.setStyleSheet(MENU_QSS)
@@ -606,6 +591,31 @@ class PetWindow(QWidget):
         self._gb_state_action = gb.addAction('优化状态: 查询中…')
         self._gb_state_action.setEnabled(False)
         menu.aboutToShow.connect(self._update_gb_state)
+
+        # 算命
+        div = menu.addMenu('🔮 决疑')
+        div.setStyleSheet(MENU_QSS)
+        div.addAction('塔罗', lambda: self._start_divination('tarot'))
+        div.addAction('六爻', lambda: self._start_divination('iching'))
+        div.addAction('小六壬', lambda: self._start_divination('xiaoliuren'))
+        div.addAction('八字', lambda: self._start_divination('bazi'))
+        div.addSeparator()
+        div.addAction('最近记录', self._open_div_recent)
+
+        menu.addSeparator()
+        # 手动录屏(文字动态切换)
+        self._manual_rec_action = menu.addAction("开始录屏")
+        self._manual_rec_action.triggered.connect(self._toggle_record)
+        menu.aboutToShow.connect(self._update_menu_rec_text)
+
+        # 播放/停止音乐(一个按钮,按状态切换文字)
+        self._music_action = menu.addAction("播放音乐")
+        self._music_action.triggered.connect(self._music_toggle_play_stop)
+        menu.aboutToShow.connect(self._update_menu_music_text)
+
+        menu.addAction('AI 对话', self._open_chat)
+        menu.addAction('查看用量', self._open_usage)
+
         menu.addSeparator()
 
         # 开机自启动
@@ -741,8 +751,12 @@ class PetWindow(QWidget):
     def _on_bubble_click(self):
         """点击气泡:音乐模式打开歌词窗口;算命气泡打开详情;否则打开AI对话。"""
         if self._in_music_mode():
+            # 最小化状态下 show()+raise_() 不会恢复,必须先 showNormal()
+            if self._lyric_win.isMinimized():
+                self._lyric_win.showNormal()
             self._lyric_win.show()
             self._lyric_win.raise_()
+            self._lyric_win.activateWindow()
             return
         if self._last_div_record_id and time.monotonic() < getattr(self, "_div_bubble_until", 0.0):
             self._open_div_window(self._last_div_record_id)
@@ -760,7 +774,7 @@ class PetWindow(QWidget):
             try:
                 from settings_window import load_settings
                 if not (load_settings().get("divination", {}).get("birth") or "").strip():
-                    self._show_bubble("先到 宠物设置 → 算命 里填公历生日，才能起八字哦~", duration=5000)
+                    self._show_bubble("先到 宠物设置 → 决疑 里填公历生日，才能起八字哦~", duration=5000)
                     return
             except Exception:
                 pass
@@ -799,7 +813,7 @@ class PetWindow(QWidget):
             pass
         if rec.get("error"):
             self.set_state("hurt")
-            self._show_bubble(f"算命失败：{rec['error']}", duration=8000)
+            self._show_bubble(f"决疑失败：{rec['error']}", duration=8000)
             return
         self._last_div_record_id = rec.get("id")
         self._div_bubble_until = time.monotonic() + 20
@@ -872,7 +886,7 @@ class PetWindow(QWidget):
         from divination import recent_records
         recs = recent_records(limit=10)
         if not recs:
-            self._show_bubble("还没有算命记录哦~", duration=3000)
+            self._show_bubble("还没有决疑记录哦~", duration=3000)
             return
         labels = []
         for r in recs:
@@ -880,7 +894,7 @@ class PetWindow(QWidget):
             q = (r.get("question") or "").strip() or "未填问题"
             st = {"pending": "待应验", "fulfilled": "已应验", "partial": "部分应验", "void": "已结束"}.get(r["status"], r["status"])
             labels.append(f"#{r['id']} {label}·{q} [{st}]")
-        sel, ok = QInputDialog.getItem(self, "算命记录", "选择一条查看：", labels, 0, False)
+        sel, ok = QInputDialog.getItem(self, "决疑记录", "选择一条查看：", labels, 0, False)
         if ok and sel:
             try:
                 rec_id = int(sel.split("#")[1].split(" ")[0])
@@ -917,6 +931,27 @@ class PetWindow(QWidget):
         self.set_state("hurt")
         self.behave_until = time.monotonic() + 3.0
 
+    def _on_dsh_task_done(self, info):
+        """DSH 任务完成:弹气泡提醒 用时 + token + 费用。"""
+        try:
+            from dsh_watcher import _fmt_duration, _fmt_tokens, _fmt_cost
+            seconds = info.get("seconds") or 0
+            total = info.get("total_tokens") or 0
+            cost = info.get("cost") or 0.0
+            parts = [
+                f"DSH 任务完成",
+                f"用时 {_fmt_duration(seconds)}",
+                f"Token {_fmt_tokens(total)}",
+                f"约 {_fmt_cost(cost)}",
+            ]
+            text = " · ".join(parts)
+            self._show_bubble(text, duration=10000)
+            # 任务完成,开心一下
+            self.set_state("happy")
+            self.behave_until = time.monotonic() + 3.0
+        except Exception as e:
+            print(f"[DSHWatch] 气泡提醒失败: {e}")
+
     # ---------- 主动功能:游戏检测 + 凌晨关心 ----------
     # 游戏关键词 -> 给 OpenClaw 的场景提示(生成不同话术)
     GAME_PROMPTS = {
@@ -933,10 +968,29 @@ class PetWindow(QWidget):
         "PUBG": "比如问这局能吃到鸡不",
         "永劫无间": "比如聊振刀、出金、连胜了没",
         "DOTA2": "比如问这局局势如何、别被翻盘",
+        "王者万象棋": "比如问这局阵容成型没、连胜几局了、棋子质量咋样、登顶了没",
+        "万象棋": "比如问这局运营得咋样、吃鸡/登顶了没",
         "王者荣耀": "比如问这把赢了没、玩啥英雄、别连跪",
-        "王者玩象棋": "比如问这步走得妙不妙、局势如何、将军了没",
         "崩坏": "比如问抽卡出货没、打到哪里了",
         "我的世界": "比如问建了啥、挖到钻石没",
+    }
+
+    # 进程名 -> 游戏名兜底映射(窗口标题不含关键词时用, 如某些客户端标题是英文/乱码)。
+    # 值必须与 GAME_PROMPTS 的 key 完全一致, 否则触发时 GAME_PROMPTS[detected_game] 会 KeyError。
+    GAME_PROCESS_NAMES = {
+        "deltadforce.exe": "三角洲",
+        "deltaforce.exe": "三角洲",
+        "valorant.exe": "无畏契约",
+        "leagueclient.exe": "英雄联盟",
+        "league of legends.exe": "英雄联盟",
+        "cs2.exe": "CS2",
+        "csgo.exe": "CSGO",
+        "genshinimpact.exe": "原神",
+        "r5apex.exe": "Apex",
+        "tslgame.exe": "PUBG",
+        "naraka.exe": "永劫无间",
+        "dota2.exe": "DOTA2",
+        "minecraft.exe": "我的世界",
     }
 
     def _get_foreground_title(self):
@@ -1041,13 +1095,19 @@ class PetWindow(QWidget):
         except Exception:
             pass
 
-        # 1. 游戏检测
+        # 1. 游戏检测: 窗口标题关键词优先, 进程名兜底
         title = self._get_foreground_title()
         detected_game = None
         for keyword in self.GAME_PROMPTS:
             if keyword.lower() in title.lower():
                 detected_game = keyword
                 break
+        if not detected_game:
+            pname = (self._get_foreground_process_name() or "").lower()
+            for pname_key, gname in self.GAME_PROCESS_NAMES.items():
+                if pname_key in pname:
+                    detected_game = gname
+                    break
 
         if detected_game and detected_game != self._current_game:
             # 刚切换到游戏,主动说话(节流 60 秒);播放音乐时闭嘴,专心听歌
@@ -1103,7 +1163,7 @@ class PetWindow(QWidget):
         if self._in_music_mode():
             return  # 播放音乐时不评论,专心听歌看歌词
         # 王者玩象棋固定2分钟一次; 其他游戏按设置随机间隔(默认2~10分钟)
-        is_chess = "王者玩象棋" in self._current_game
+        is_chess = ("王者万象棋" in self._current_game) or ("万象棋" in self._current_game)
         if is_chess:
             nxt_ms = 120000
         else:
@@ -1137,6 +1197,14 @@ class PetWindow(QWidget):
         if longing < threshold and idle_hours < max_hours:
             return  # 还没那么想你, 不打扰
         self._last_idle_comment = now
+        # 主动说完话后, 想念值被"满足"一截, 避免说完又立刻撒娇
+        try:
+            from memory import load_char_state, save_char_state
+            _st = load_char_state()
+            _st["longing"] = max(0.0, _st.get("longing", 0.0) - 0.6)
+            save_char_state(_st)
+        except Exception:
+            pass
         _, owner, _, idt = build_pet_identity()
         # ── 触发: 一半概率纯文本撒娇(快、省视觉模型), 一半概率截图看看主人在干嘛 ──
         if random.random() < 0.5:
@@ -1367,6 +1435,28 @@ class PetWindow(QWidget):
         if hasattr(self, "_manual_rec_action"):
             rec = get_recorder()
             self._manual_rec_action.setText("停止录屏" if rec.is_recording else "开始录屏")
+
+    def _update_menu_music_text(self):
+        """菜单显示时更新音乐按钮文字(播放中→停止音乐, 否则→播放音乐)。"""
+        if hasattr(self, "_music_action"):
+            try:
+                mp = MusicPlayer.get()
+                playing = bool(mp.is_playing or mp._paused)
+            except Exception:
+                playing = False
+            self._music_action.setText("停止音乐" if playing else "播放音乐")
+
+    def _music_toggle_play_stop(self):
+        """播放/停止音乐共用一个菜单项: 在播→停止, 未播→播放。"""
+        try:
+            mp = MusicPlayer.get()
+            if mp.is_playing or mp._paused:
+                self._music_stop()
+            else:
+                self._music_play_pause()
+        except Exception as e:
+            print(f"[Music] 菜单切换失败: {e}")
+            self._show_bubble("音乐暂时开不了…", duration=3000)
 
     # ── 音乐控制 ──
     def _music_play_pause(self):
@@ -1626,6 +1716,12 @@ class PetWindow(QWidget):
             mp.stop()
         # 停止心率/蓝牙(HeartManager 内部负责 join 其线程)
         self.heart.stop()
+        # 停止 DSH 任务监听线程
+        try:
+            self._dsh_watcher.stop()
+            self._dsh_watcher.wait(2000)
+        except Exception:
+            pass
         self._bubble_widget.close()
         if self.heart_win is not None:
             self.heart_win.close()
